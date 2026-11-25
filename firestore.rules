@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // CAMBIA el correo y el año (2026) si hace falta.
+    function admin() {
+      return request.auth != null
+        && request.auth.token.email == 'tucorreo@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+    // Medianoche en Lima (UTC-5) del día d de diciembre.
+    function unlocked(d) {
+      return request.time >= timestamp.date(2026, 12, int(d)) + duration.value(5, 'h');
+    }
+    // Un mensaje solo se puede leer cuando llega su día, aunque alguien cambie la hora de su celular.
+    match /days/{d} {
+      allow read: if admin() || unlocked(d);
+      allow write: if admin();
+    }
+    // Registro de qué estrellas abrió ella.
+    match /opened/{d} {
+      allow create: if unlocked(d) && request.resource.data.keys().hasOnly(['at']);
+      allow read, write: if admin();
+    }
+    // Respuestas a las preguntas: ella puede escribir una vez que llega el día; solo tú las lees.
+    match /answers/{d} {
+      allow create, update: if unlocked(d) && request.resource.data.keys().hasOnly(['text','at']) && request.resource.data.text is string && request.resource.data.text.size() < 2000;
+      allow read, write: if admin();
+    }
+  }
+}
